@@ -73,6 +73,8 @@ export function registerBotRoutes(app: Express) {
             price: link.price,
             discount: link.discount,
             description: link.description,
+            category: link.category,
+            customMessage: schedule.customMessage,
           });
         }
       }
@@ -116,9 +118,12 @@ export function registerBotRoutes(app: Express) {
             price: link.price,
             discount: link.discount,
             description: link.description,
+            category: link.category,
             daysOfWeek: schedule.daysOfWeek,
             hour: schedule.hour,
             minute: schedule.minute,
+            customMessage: schedule.customMessage,
+            repeatWeekly: schedule.repeatWeekly,
           });
         }
       }
@@ -129,6 +134,8 @@ export function registerBotRoutes(app: Express) {
           allowedStartHour: settings.allowedStartHour,
           allowedEndHour: settings.allowedEndHour,
           whatsappGroupId: settings.whatsappGroupId,
+          allowWeekends: settings.allowWeekends,
+          defaultMessage: settings.defaultMessage,
         },
       });
     } catch (error) {
@@ -163,6 +170,20 @@ export function registerBotRoutes(app: Express) {
         status,
         errorMessage: errorMessage ?? null,
       });
+
+      // Create notification for the send
+      try {
+        await db.createNotification({
+          userId: settings.userId,
+          title: status === 'success' ? 'Link enviado com sucesso' : 'Falha no envio',
+          message: status === 'success'
+            ? `O link "${link?.title ?? 'Desconhecido'}" foi enviado para o grupo do WhatsApp.`
+            : `Falha ao enviar "${link?.title ?? 'Desconhecido'}": ${errorMessage ?? 'Erro desconhecido'}`,
+          type: status === 'success' ? 'send_success' : 'send_failed',
+          read: false,
+          relatedLinkId: linkId ?? null,
+        });
+      } catch { /* ignore */ }
 
       res.json({ success: true });
     } catch (error) {

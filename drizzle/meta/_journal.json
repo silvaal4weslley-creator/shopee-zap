@@ -15,6 +15,13 @@
       "when": 1774070100725,
       "tag": "0001_optimal_carlie_cooper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1774071921147,
+      "tag": "0002_sour_titanium_man",
+      "breakpoints": true
     }
   ]
 }

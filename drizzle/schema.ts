@@ -35,6 +35,7 @@ export const links = mysqlTable("links", {
   price: varchar("price", { length: 50 }),
   discount: varchar("discount", { length: 50 }),
   description: text("description"),
+  category: varchar("category", { length: 100 }),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -52,6 +53,10 @@ export const schedules = mysqlTable("schedules", {
   daysOfWeek: varchar("daysOfWeek", { length: 50 }).notNull(),
   hour: int("hour").notNull(),
   minute: int("minute").notNull(),
+  /** Mensagem personalizada que acompanha o link */
+  customMessage: text("customMessage"),
+  /** Se repete semanalmente */
+  repeatWeekly: boolean("repeatWeekly").default(true).notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -80,17 +85,33 @@ export type InsertSendHistory = typeof sendHistory.$inferInsert;
 export const settings = mysqlTable("settings", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),
-  /** Hora de início permitida para envios (0-23) */
   allowedStartHour: int("allowedStartHour").default(8).notNull(),
-  /** Hora de fim permitida para envios (0-23) */
   allowedEndHour: int("allowedEndHour").default(22).notNull(),
-  /** ID do grupo WhatsApp */
   whatsappGroupId: varchar("whatsappGroupId", { length: 100 }),
-  /** Chave de API para o bot acessar */
   botApiKey: varchar("botApiKey", { length: 100 }),
+  /** Permitir envios nos finais de semana */
+  allowWeekends: boolean("allowWeekends").default(true).notNull(),
+  /** Mensagem padrão que acompanha todos os envios */
+  defaultMessage: text("defaultMessage"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Settings = typeof settings.$inferSelect;
 export type InsertSettings = typeof settings.$inferInsert;
+
+// ─── Notifications (Notificações) ───────────────────────────────────
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  message: text("message"),
+  type: mysqlEnum("type", ["send_success", "send_failed", "schedule_created", "system"]).default("system").notNull(),
+  read: boolean("read").default(false).notNull(),
+  relatedLinkId: int("relatedLinkId"),
+  relatedScheduleId: int("relatedScheduleId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;

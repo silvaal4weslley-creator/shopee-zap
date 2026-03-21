@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -6,6 +6,7 @@ import {
   schedules, InsertSchedule,
   sendHistory, InsertSendHistory,
   settings, InsertSettings,
+  notifications, InsertNotification,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -127,14 +128,12 @@ export async function deleteSchedule(id: number) {
   await db.delete(schedules).where(eq(schedules.id, id));
 }
 
-/** Buscar agendamentos ativos para um dado dia/hora/minuto */
 export async function getActiveSchedulesForTime(dayOfWeek: number, hour: number, minute: number) {
   const db = await getDb();
   if (!db) return [];
   const allActive = await db.select().from(schedules).where(
     and(eq(schedules.active, true), eq(schedules.hour, hour), eq(schedules.minute, minute))
   );
-  // Filtrar por dia da semana (armazenado como string "0,1,2,3")
   return allActive.filter(s => {
     const days = s.daysOfWeek.split(",").map(d => parseInt(d.trim()));
     return days.includes(dayOfWeek);
@@ -153,6 +152,43 @@ export async function getSendHistory(userId: number, limit = 100) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(sendHistory).where(eq(sendHistory.userId, userId)).orderBy(desc(sendHistory.sentAt)).limit(limit);
+}
+
+// ─── Dashboard Stats ────────────────────────────────────────────────
+export async function getDashboardStats(userId: number) {
+  const db = await getDb();
+  if (!db) return { linksCount: 0, schedulesCount: 0, sentCount: 0, failedCount: 0, pendingCount: 0 };
+
+  const [linksResult] = await db.select({ count: count() }).from(links).where(eq(links.userId, userId));
+  const [schedulesResult] = await db.select({ count: count() }).from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.active, true)));
+  const [sentResult] = await db.select({ count: count() }).from(sendHistory).where(and(eq(sendHistory.userId, userId), eq(sendHistory.status, "success")));
+  const [failedResult] = await db.select({ count: count() }).from(sendHistory).where(and(eq(sendHistory.userId, userId), eq(sendHistory.status, "failed")));
+  const [pendingResult] = await db.select({ count: count() }).from(sendHistory).where(and(eq(sendHistory.userId, userId), eq(sendHistory.status, "pending")));
+
+  return {
+    linksCount: linksResult?.count ?? 0,
+    schedulesCount: schedulesResult?.count ?? 0,
+    sentCount: sentResult?.count ?? 0,
+    failedCount: failedResult?.count ?? 0,
+    pendingCount: pendingResult?.count ?? 0,
+  };
+}
+
+/** Get upcoming schedules with link info */
+export async function getUpcomingSchedules(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const activeSchedules = await db.select().from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.active, true)));
+  const result = [];
+  for (const sched of activeSchedules) {
+    const link = await getLinkById(sched.linkId);
+    result.push({
+      ...sched,
+      linkTitle: link?.title ?? "Link removido",
+      linkUrl: link?.url ?? "",
+    });
+  }
+  return result;
 }
 
 // ─── Settings ────────────────────────────────────────────────────────
@@ -174,10 +210,42 @@ export async function upsertSettings(userId: number, data: Partial<Omit<InsertSe
   }
 }
 
-/** Buscar settings pelo botApiKey (para rota pública) */
 export async function getSettingsByApiKey(apiKey: string) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(settings).where(eq(settings.botApiKey, apiKey)).limit(1);
   return result[0];
+}
+
+// ─── Notifications ──────────────────────────────────────────────────
+export async function createNotification(data: Omit<InsertNotification, "id" | "createdAt">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(notifications).values(data);
+  return result[0].insertId;
+}
+
+export async function getNotifications(userId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit);
+}
+
+export async function getUnreadNotificationCount(userId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ count: count() }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
+  return result?.count ?? 0;
+}
+
+export async function markNotificationRead(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+}
+
+export async function markAllNotificationsRead(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(notifications).set({ read: true }).where(eq(notifications.userId, userId));
 }

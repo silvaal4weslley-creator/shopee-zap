@@ -21,16 +21,20 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Link2, CalendarClock, History, Settings, LogOut, PanelLeft, Zap } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { LayoutDashboard, Link2, CalendarClock, History, MessageCircle, Bell, Settings, LogOut, PanelLeft, Zap } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: Link2, label: "Links", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Link2, label: "Meus Links", path: "/links" },
   { icon: CalendarClock, label: "Agendamentos", path: "/schedules" },
   { icon: History, label: "Histórico", path: "/history" },
+  { icon: MessageCircle, label: "Chatbot", path: "/chatbot" },
+  { icon: Bell, label: "Notificações", path: "/notifications", hasBadge: true },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];
 
@@ -120,6 +124,11 @@ function DashboardLayoutContent({
   const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
+  // Fetch unread notification count
+  const { data: unreadCount } = trpc.notifications.unreadCount.useQuery(undefined, {
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
   useEffect(() => {
     if (isCollapsed) {
       setIsResizing(false);
@@ -186,8 +195,20 @@ function DashboardLayoutContent({
                       tooltip={item.label}
                       className="h-10 transition-all font-normal"
                     >
-                      <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+                      <div className="relative">
+                        <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+                        {item.hasBadge && unreadCount && unreadCount > 0 ? (
+                          <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        ) : null}
+                      </div>
                       <span>{item.label}</span>
+                      {item.hasBadge && unreadCount && unreadCount > 0 && !isCollapsed ? (
+                        <span className="ml-auto h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold flex items-center justify-center">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      ) : null}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

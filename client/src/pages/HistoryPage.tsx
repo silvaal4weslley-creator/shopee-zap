@@ -1,100 +1,122 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { History, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, History, ExternalLink } from "lucide-react";
 
-function StatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case "success":
-      return (
-        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-0">
-          <CheckCircle2 className="h-3 w-3 mr-1" />Enviado
-        </Badge>
-      );
-    case "failed":
-      return (
-        <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-0">
-          <XCircle className="h-3 w-3 mr-1" />Falhou
-        </Badge>
-      );
-    default:
-      return (
-        <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-0">
-          <Clock className="h-3 w-3 mr-1" />Pendente
-        </Badge>
-      );
-  }
-}
+const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  sent: { label: "Enviado", color: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" /> },
+  success: { label: "Enviado", color: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" /> },
+  failed: { label: "Falha", color: "bg-red-100 text-red-700", icon: <XCircle className="h-4 w-4 text-red-500" /> },
+  pending: { label: "Pendente", color: "bg-amber-100 text-amber-700", icon: <Clock className="h-4 w-4 text-amber-500" /> },
+};
 
 export default function HistoryPage() {
   const { data: history, isLoading } = trpc.history.list.useQuery({});
+  const { data: stats } = trpc.dashboard.stats.useQuery();
+
+  const sentCount = stats?.sentCount ?? 0;
+  const failedCount = stats?.failedCount ?? 0;
+  const pendingCount = stats?.pendingCount ?? 0;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Histórico</h1>
-          <p className="text-muted-foreground text-sm mt-1">Acompanhe todos os envios realizados</p>
+          <h1 className="text-2xl font-bold tracking-tight">Histórico de Envios</h1>
+          <p className="text-muted-foreground mt-1">
+            Acompanhe todos os links enviados e seus status
+          </p>
         </div>
 
-        {isLoading ? (
-          <Card>
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-12 bg-muted rounded animate-pulse" />)}
-              </div>
-            </CardContent>
-          </Card>
-        ) : history && history.length > 0 ? (
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data/Hora</TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Detalhes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {new Date(item.sentAt).toLocaleString("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </TableCell>
-                      <TableCell className="font-medium max-w-[250px] truncate">
-                        {item.linkTitle ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={item.status} />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                        {item.errorMessage ?? "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <History className="h-12 w-12 text-muted-foreground/30 mb-4" />
-              <h3 className="font-medium text-lg mb-1">Nenhum envio registrado</h3>
-              <p className="text-muted-foreground text-sm">Os envios aparecerão aqui quando o bot começar a funcionar</p>
-            </CardContent>
-          </Card>
-        )}
+        {/* Summary cards */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-xl border bg-emerald-50 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-600">{sentCount}</p>
+              <p className="text-xs text-muted-foreground">Enviados</p>
+            </div>
+          </div>
+          <div className="rounded-xl border bg-red-50 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+              <XCircle className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-600">{failedCount}</p>
+              <p className="text-xs text-muted-foreground">Falhas</p>
+            </div>
+          </div>
+          <div className="rounded-xl border bg-amber-50 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+              <Clock className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
+              <p className="text-xs text-muted-foreground">Pendentes</p>
+            </div>
+          </div>
+        </div>
+
+        {/* History list */}
+        <div className="bg-card rounded-xl border p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <History className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Registro de Envios</h2>
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="h-14 bg-muted/30 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : history && history.length > 0 ? (
+            <div className="space-y-2">
+              {history.map((item: any) => {
+                const statusInfo = STATUS_MAP[item.status] ?? STATUS_MAP.pending;
+                const sentAt = item.sentAt ? new Date(item.sentAt) : null;
+                const dateStr = sentAt
+                  ? sentAt.toLocaleDateString("pt-BR") + ", " + sentAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                  : "—";
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="shrink-0">{statusInfo.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{item.linkTitle ?? "—"}</p>
+                        {item.linkUrl && (
+                          <a
+                            href={item.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0"
+                          >
+                            <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{dateStr}</p>
+                    </div>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${statusInfo.color}`}>
+                      {statusInfo.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <History className="h-10 w-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Nenhum envio registrado</p>
+              <p className="text-xs mt-1">Os envios aparecerão aqui quando o bot começar a funcionar</p>
+            </div>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

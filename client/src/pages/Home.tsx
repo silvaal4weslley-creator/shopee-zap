@@ -1,236 +1,161 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, ExternalLink, ImageIcon, Loader2, Link2 } from "lucide-react";
-import { useState, useRef } from "react";
-import { toast } from "sonner";
+import { Link2, CalendarClock, CheckCircle2, XCircle, Clock, Zap, ArrowRight } from "lucide-react";
+import { useLocation } from "wouter";
 
-function LinkForm({ onSuccess, editData }: {
-  onSuccess: () => void;
-  editData?: { id: number; url: string; title: string; imageUrl?: string | null; price?: string | null; discount?: string | null; description?: string | null };
-}) {
-  const [url, setUrl] = useState(editData?.url ?? "");
-  const [title, setTitle] = useState(editData?.title ?? "");
-  const [imageUrl, setImageUrl] = useState(editData?.imageUrl ?? "");
-  const [price, setPrice] = useState(editData?.price ?? "");
-  const [discount, setDiscount] = useState(editData?.discount ?? "");
-  const [description, setDescription] = useState(editData?.description ?? "");
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const utils = trpc.useUtils();
-  const createMutation = trpc.links.create.useMutation({
-    onSuccess: () => {
-      utils.links.list.invalidate();
-      toast.success("Link criado com sucesso!");
-      onSuccess();
-    },
-    onError: (err) => toast.error(err.message),
-  });
-  const updateMutation = trpc.links.update.useMutation({
-    onSuccess: () => {
-      utils.links.list.invalidate();
-      toast.success("Link atualizado!");
-      onSuccess();
-    },
-    onError: (err) => toast.error(err.message),
-  });
-  const uploadMutation = trpc.links.uploadImage.useMutation();
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Imagem deve ter no máximo 5MB");
-      return;
-    }
-    setUploading(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(",")[1];
-        const result = await uploadMutation.mutateAsync({
-          fileName: file.name,
-          fileBase64: base64,
-          contentType: file.type,
-        });
-        setImageUrl(result.url);
-        setUploading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch {
-      toast.error("Erro ao enviar imagem");
-      setUploading(false);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!url || !title) {
-      toast.error("URL e título são obrigatórios");
-      return;
-    }
-    const data = { url, title, imageUrl: imageUrl || undefined, price: price || undefined, discount: discount || undefined, description: description || undefined };
-    if (editData) {
-      updateMutation.mutate({ id: editData.id, ...data });
-    } else {
-      createMutation.mutate(data);
-    }
-  };
-
-  const isLoading = createMutation.isPending || updateMutation.isPending;
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label>URL do Produto *</Label>
-        <Input placeholder="https://shopee.com.br/..." value={url} onChange={e => setUrl(e.target.value)} />
-      </div>
-      <div className="space-y-2">
-        <Label>Título *</Label>
-        <Input placeholder="Nome do produto" value={title} onChange={e => setTitle(e.target.value)} />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Preço</Label>
-          <Input placeholder="R$ 99,90" value={price} onChange={e => setPrice(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Desconto</Label>
-          <Input placeholder="50% OFF" value={discount} onChange={e => setDiscount(e.target.value)} />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>Descrição</Label>
-        <Textarea placeholder="Descrição do produto..." value={description} onChange={e => setDescription(e.target.value)} rows={3} />
-      </div>
-      <div className="space-y-2">
-        <Label>Imagem</Label>
-        <div className="flex items-center gap-3">
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-          <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-            {uploading ? "Enviando..." : "Upload"}
-          </Button>
-          {imageUrl && <img src={imageUrl} alt="" className="h-10 w-10 rounded object-cover" />}
-        </div>
-        <Input placeholder="Ou cole a URL da imagem" value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="mt-2" />
-      </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-        {editData ? "Salvar Alterações" : "Adicionar Link"}
-      </Button>
-    </form>
-  );
-}
+const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 export default function Home() {
-  const { data: links, isLoading } = trpc.links.list.useQuery();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editLink, setEditLink] = useState<any>(null);
-  const utils = trpc.useUtils();
-
-  const deleteMutation = trpc.links.delete.useMutation({
-    onSuccess: () => {
-      utils.links.list.invalidate();
-      toast.success("Link removido!");
-    },
-  });
+  const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery();
+  const { data: upcoming, isLoading: upcomingLoading } = trpc.dashboard.upcoming.useQuery();
+  const [, setLocation] = useLocation();
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Links</h1>
-            <p className="text-muted-foreground text-sm mt-1">Gerencie seus links de produtos Shopee</p>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditLink(null); }}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />Novo Link</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{editLink ? "Editar Link" : "Novo Link"}</DialogTitle>
-              </DialogHeader>
-              <LinkForm
-                editData={editLink}
-                onSuccess={() => { setDialogOpen(false); setEditLink(null); }}
-              />
-            </DialogContent>
-          </Dialog>
+      <div className="space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Visão geral da sua automação de links da Shopee
+          </p>
         </div>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-4">
-                  <div className="h-40 bg-muted rounded-lg mb-3" />
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </CardContent>
-              </Card>
-            ))}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard
+            icon={<Link2 className="h-5 w-5" />}
+            value={stats?.linksCount ?? 0}
+            label="Links Cadastrados"
+            color="bg-blue-50 text-blue-600"
+            iconBg="bg-blue-100"
+            loading={statsLoading}
+          />
+          <StatCard
+            icon={<CalendarClock className="h-5 w-5" />}
+            value={stats?.schedulesCount ?? 0}
+            label="Agendamentos"
+            color="bg-purple-50 text-purple-600"
+            iconBg="bg-purple-100"
+            loading={statsLoading}
+          />
+          <StatCard
+            icon={<CheckCircle2 className="h-5 w-5" />}
+            value={stats?.sentCount ?? 0}
+            label="Enviados"
+            color="bg-emerald-50 text-emerald-600"
+            iconBg="bg-emerald-100"
+            loading={statsLoading}
+          />
+          <StatCard
+            icon={<XCircle className="h-5 w-5" />}
+            value={stats?.failedCount ?? 0}
+            label="Falhas"
+            color="bg-red-50 text-red-600"
+            iconBg="bg-red-100"
+            loading={statsLoading}
+          />
+          <StatCard
+            icon={<Clock className="h-5 w-5" />}
+            value={stats?.pendingCount ?? 0}
+            label="Pendentes"
+            color="bg-amber-50 text-amber-600"
+            iconBg="bg-amber-100"
+            loading={statsLoading}
+          />
+        </div>
+
+        {/* Upcoming Sends */}
+        <div className="bg-card rounded-xl border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Próximos Envios</h2>
+            </div>
+            <button
+              onClick={() => setLocation("/schedules")}
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
+              Ver todos <ArrowRight className="h-3.5 w-3.5" />
+            </button>
           </div>
-        ) : links && links.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {links.map(link => (
-              <Card key={link.id} className="group hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  {link.imageUrl ? (
-                    <div className="relative h-40 mb-3 rounded-lg overflow-hidden bg-muted">
-                      <img src={link.imageUrl} alt={link.title} className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="h-40 mb-3 rounded-lg bg-muted flex items-center justify-center">
-                      <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
-                    </div>
-                  )}
-                  <h3 className="font-medium text-sm line-clamp-2 mb-2">{link.title}</h3>
-                  <div className="flex items-center gap-2 mb-3">
-                    {link.price && <Badge variant="secondary" className="text-xs">{link.price}</Badge>}
-                    {link.discount && <Badge className="text-xs bg-red-500 hover:bg-red-600 text-white">{link.discount}</Badge>}
+
+          {upcomingLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-14 bg-muted/50 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : upcoming && upcoming.length > 0 ? (
+            <div className="space-y-2">
+              {upcoming.map((item: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Zap className="h-4 w-4 text-primary" />
                   </div>
-                  {link.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{link.description}</p>
-                  )}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="sm" onClick={() => window.open(link.url, "_blank")}>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setEditLink(link); setDialogOpen(true); }}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => {
-                      if (confirm("Remover este link?")) deleteMutation.mutate({ id: link.id });
-                    }}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{item.linkTitle}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.dayName} às {String(item.hour).padStart(2, "0")}:{String(item.minute).padStart(2, "0")}
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Link2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
-              <h3 className="font-medium text-lg mb-1">Nenhum link cadastrado</h3>
-              <p className="text-muted-foreground text-sm mb-4">Adicione seu primeiro link de produto Shopee</p>
-              <Button onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />Adicionar Link
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                    {item.repeatWeekly ? "Semanal" : "Único"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <CalendarClock className="h-10 w-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Nenhum envio agendado</p>
+              <button
+                onClick={() => setLocation("/schedules")}
+                className="text-sm text-primary hover:underline mt-2"
+              >
+                Criar agendamento
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+function StatCard({
+  icon,
+  value,
+  label,
+  color,
+  iconBg,
+  loading,
+}: {
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  color: string;
+  iconBg: string;
+  loading: boolean;
+}) {
+  return (
+    <div className={`rounded-xl border p-4 ${color.split(" ")[0]} transition-all hover:shadow-sm`}>
+      <div className="flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-full ${iconBg} flex items-center justify-center shrink-0`}>
+          {icon}
+        </div>
+        <div>
+          {loading ? (
+            <div className="h-7 w-8 bg-muted/50 rounded animate-pulse" />
+          ) : (
+            <p className={`text-2xl font-bold ${color.split(" ")[1]}`}>{value}</p>
+          )}
+          <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+        </div>
+      </div>
+    </div>
   );
 }
