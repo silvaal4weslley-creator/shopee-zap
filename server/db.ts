@@ -1,11 +1,16 @@
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import {
+  InsertUser, users,
+  links, InsertLink,
+  schedules, InsertSchedule,
+  sendHistory, InsertSendHistory,
+  settings, InsertSettings,
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -18,26 +23,17 @@ export async function getDb() {
   return _db;
 }
 
+// ─── Users ───────────────────────────────────────────────────────────
 export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
-
+  if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
+  if (!db) { console.warn("[Database] Cannot upsert user: database not available"); return; }
 
   try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
+    const values: InsertUser = { openId: user.openId };
     const updateSet: Record<string, unknown> = {};
-
     const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
-
     const assignNullable = (field: TextField) => {
       const value = user[field];
       if (value === undefined) return;
@@ -45,32 +41,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values[field] = normalized;
       updateSet[field] = normalized;
     };
-
     textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
+    if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
+    if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
+    else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
+    if (!values.lastSignedIn) values.lastSignedIn = new Date();
+    if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
+    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -79,14 +56,128 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
+  if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ─── Links ───────────────────────────────────────────────────────────
+export async function createLink(data: Omit<InsertLink, "id" | "createdAt" | "updatedAt">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(links).values(data);
+  return result[0].insertId;
+}
+
+export async function getLinks(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(links).where(eq(links.userId, userId)).orderBy(desc(links.createdAt));
+}
+
+export async function getLinkById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(links).where(eq(links.id, id)).limit(1);
+  return result[0];
+}
+
+export async function updateLink(id: number, data: Partial<InsertLink>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(links).set(data).where(eq(links.id, id));
+}
+
+export async function deleteLink(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(links).where(eq(links.id, id));
+}
+
+// ─── Schedules ───────────────────────────────────────────────────────
+export async function createSchedule(data: Omit<InsertSchedule, "id" | "createdAt" | "updatedAt">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(schedules).values(data);
+  return result[0].insertId;
+}
+
+export async function getSchedules(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(schedules).where(eq(schedules.userId, userId)).orderBy(desc(schedules.createdAt));
+}
+
+export async function getScheduleById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(schedules).where(eq(schedules.id, id)).limit(1);
+  return result[0];
+}
+
+export async function updateSchedule(id: number, data: Partial<InsertSchedule>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(schedules).set(data).where(eq(schedules.id, id));
+}
+
+export async function deleteSchedule(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(schedules).where(eq(schedules.id, id));
+}
+
+/** Buscar agendamentos ativos para um dado dia/hora/minuto */
+export async function getActiveSchedulesForTime(dayOfWeek: number, hour: number, minute: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const allActive = await db.select().from(schedules).where(
+    and(eq(schedules.active, true), eq(schedules.hour, hour), eq(schedules.minute, minute))
+  );
+  // Filtrar por dia da semana (armazenado como string "0,1,2,3")
+  return allActive.filter(s => {
+    const days = s.daysOfWeek.split(",").map(d => parseInt(d.trim()));
+    return days.includes(dayOfWeek);
+  });
+}
+
+// ─── Send History ────────────────────────────────────────────────────
+export async function createSendHistory(data: Omit<InsertSendHistory, "id" | "sentAt">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(sendHistory).values(data);
+  return result[0].insertId;
+}
+
+export async function getSendHistory(userId: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sendHistory).where(eq(sendHistory.userId, userId)).orderBy(desc(sendHistory.sentAt)).limit(limit);
+}
+
+// ─── Settings ────────────────────────────────────────────────────────
+export async function getSettings(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  return result[0];
+}
+
+export async function upsertSettings(userId: number, data: Partial<Omit<InsertSettings, "id" | "userId" | "createdAt" | "updatedAt">>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await getSettings(userId);
+  if (existing) {
+    await db.update(settings).set(data).where(eq(settings.userId, userId));
+  } else {
+    await db.insert(settings).values({ userId, ...data });
+  }
+}
+
+/** Buscar settings pelo botApiKey (para rota pública) */
+export async function getSettingsByApiKey(apiKey: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(settings).where(eq(settings.botApiKey, apiKey)).limit(1);
+  return result[0];
+}
