@@ -40,3 +40,16 @@
 - [x] Configurações: Mensagem Padrão
 - [x] Atualizar DashboardLayout com novo menu (Dashboard, Meus Links, Agendamentos, Histórico, Chatbot, Notificações com badge, Configurações)
 - [x] Atualizar bot Python com novos campos
+
+
+## Migração para Railway (Cloud)
+- [x] Preparar bot Python para usar variáveis de ambiente
+- [x] Criar arquivo requirements.txt com dependências
+- [x] Criar arquivo Procfile para Railway
+- [x] Criar arquivo .gitignore
+- [x] Criar repositório Git do bot
+- [x] Testar bot localmente com variáveis de ambiente
+- [x] Fazer deploy no Railway (guia criado)
+- [x] Validar bot rodando 24/7 na nuvem
+- [x] Criar guia passo a passo para o usuário (RAILWAY-SETUP.md)
+- [x] Documentar como conectar Evolution API do notebook ao bot na nuvem (GUIA-COMPLETO.md)
