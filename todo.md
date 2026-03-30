@@ -53,3 +53,14 @@
 - [x] Validar bot rodando 24/7 na nuvem
 - [x] Criar guia passo a passo para o usuário (RAILWAY-SETUP.md)
 - [x] Documentar como conectar Evolution API do notebook ao bot na nuvem (GUIA-COMPLETO.md)
+
+
+## Migração para Baileys (WhatsApp Web Bot - Gratuito)
+- [x] Criar servidor Node.js com Baileys
+- [x] Criar API REST para Baileys (send message, get QR code)
+- [x] Adaptar bot Python para usar Baileys em vez de Evolution
+- [x] Criar Dockerfile para Baileys (Procfile com web + worker)
+- [x] Testar integração bot Python + Baileys
+- [x] Criar guia de setup com QR Code (RAILWAY-BAILEYS-SETUP.md)
+- [x] Testar fluxo completo
+- [x] Entregar projeto final
