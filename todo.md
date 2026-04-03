@@ -64,3 +64,14 @@
 - [x] Criar guia de setup com QR Code (RAILWAY-BAILEYS-SETUP.md)
 - [x] Testar fluxo completo
 - [x] Entregar projeto final
+
+
+## Setup 100% Mobile (Render - $7/mês)
+
+- [x] Criar servidor Node.js integrado (Baileys + bot em um único arquivo)
+- [x] Criar guia passo a passo 100% pelo celular (Render)
+- [x] Testar QR Code pelo celular
+- [x] Testar cadastro de link pelo celular
+- [x] Testar agendamento pelo celular
+- [x] Testar envio de mensagem pelo celular
+- [x] Entregar projeto final mobile-ready
