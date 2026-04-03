@@ -249,6 +249,27 @@ ${linksContext || "Nenhum produto cadastrado ainda."}`,
       }),
   }),
 
+  // ─── Analytics ────────────────────────────────────────────────
+  analytics: router({
+    summary: protectedProcedure.query(async ({ ctx }) => {
+      return db.getAnalyticsSummary(ctx.user.id);
+    }),
+    byDay: protectedProcedure
+      .input(z.object({ days: z.number().default(30) }))
+      .query(async ({ ctx, input }) => {
+        return db.getAnalyticsByDay(ctx.user.id, input.days);
+      }),
+    byHour: protectedProcedure.query(async ({ ctx }) => {
+      return db.getAnalyticsByHour(ctx.user.id);
+    }),
+    byProduct: protectedProcedure.query(async ({ ctx }) => {
+      return db.getAnalyticsByProduct(ctx.user.id);
+    }),
+    byDayOfWeek: protectedProcedure.query(async ({ ctx }) => {
+      return db.getAnalyticsByDayOfWeek(ctx.user.id);
+    }),
+  }),
+
   // ─── Settings ──────────────────────────────────────────────────
   settings: router({
     get: protectedProcedure.query(async ({ ctx }) => {

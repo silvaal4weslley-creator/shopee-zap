@@ -75,3 +75,20 @@
 - [x] Testar agendamento pelo celular
 - [x] Testar envio de mensagem pelo celular
 - [x] Entregar projeto final mobile-ready
+
+
+## Analytics Avançado (Nova Feature)
+
+- [x] Criar helpers de analytics no backend (queries para dados)
+- [x] Criar routers tRPC para analytics
+- [x] Criar página de Analytics com gráficos (Recharts)
+- [x] Gráfico de Envios por Dia (com filtro 7/30/90 dias)
+- [x] Gráfico de Taxa de Sucesso vs Falhas (Pie Chart)
+- [x] Gráfico de Envios por Hora (Bar Chart)
+- [x] Gráfico de Desempenho por Dia da Semana
+- [x] Tabela de Estatísticas por Produto (Top 8)
+- [x] Cards de resumo (Total Enviados, Falhados, Taxa de Sucesso, Média/Dia)
+- [x] Integrar Analytics ao menu de navegação
+- [x] Testes Vitest para funções de analytics (5 testes passando)
+- [x] Validar responsividade em mobile
+- [x] Testar e validar gráficos

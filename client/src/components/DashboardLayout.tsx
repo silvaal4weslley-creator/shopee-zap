@@ -22,7 +22,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Link2, CalendarClock, History, MessageCircle, Bell, Settings, LogOut, PanelLeft, Zap } from "lucide-react";
+import { LayoutDashboard, Link2, CalendarClock, History, MessageCircle, Bell, Settings, LogOut, PanelLeft, Zap, BarChart3 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -33,6 +33,7 @@ const menuItems = [
   { icon: Link2, label: "Meus Links", path: "/links" },
   { icon: CalendarClock, label: "Agendamentos", path: "/schedules" },
   { icon: History, label: "Histórico", path: "/history" },
+  { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: MessageCircle, label: "Chatbot", path: "/chatbot" },
   { icon: Bell, label: "Notificações", path: "/notifications", hasBadge: true },
   { icon: Settings, label: "Configurações", path: "/settings" },

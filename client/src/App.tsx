@@ -11,6 +11,7 @@ import HistoryPage from "./pages/HistoryPage";
 import ChatbotPage from "./pages/ChatbotPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import SettingsPage from "./pages/SettingsPage";
+import Analytics from "./pages/Analytics";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/chatbot" component={ChatbotPage} />
       <Route path="/notifications" component={NotificationsPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/analytics" component={Analytics} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

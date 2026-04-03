@@ -249,3 +249,109 @@ export async function markAllNotificationsRead(userId: number) {
   if (!db) throw new Error("Database not available");
   await db.update(notifications).set({ read: true }).where(eq(notifications.userId, userId));
 }
+
+
+// ─── Analytics ──────────────────────────────────────────────────────
+export async function getAnalyticsSummary(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [totalSent] = await db.select({ count: count() }).from(sendHistory).where(and(eq(sendHistory.userId, userId), sql`status = 'sent'`));
+  const [totalFailed] = await db.select({ count: count() }).from(sendHistory).where(and(eq(sendHistory.userId, userId), sql`status = 'failed'`));
+  const [totalPending] = await db.select({ count: count() }).from(sendHistory).where(and(eq(sendHistory.userId, userId), sql`status = 'pending'`));
+
+  // Calculate average per day (last 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const last30Days = await db.select().from(sendHistory).where(
+    and(
+      eq(sendHistory.userId, userId),
+      sql`DATE(${sendHistory.sentAt}) >= DATE(${thirtyDaysAgo})`
+    )
+  );
+  const uniqueDays = new Set(last30Days.map(h => new Date(h.sentAt).toDateString())).size;
+  const averagePerDay = uniqueDays > 0 ? Math.round(last30Days.length / uniqueDays) : 0;
+
+  return {
+    totalSent: totalSent?.count ?? 0,
+    totalFailed: totalFailed?.count ?? 0,
+    totalPending: totalPending?.count ?? 0,
+    successRate: totalSent && (totalSent.count + totalFailed.count) > 0 
+      ? Math.round((totalSent.count / (totalSent.count + totalFailed.count)) * 100)
+      : 0,
+    averagePerDay,
+  };
+}
+
+export async function getAnalyticsByDay(userId: number, days = 30) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT CAST(DATE(${sendHistory.sentAt}) AS CHAR) as day,
+           COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
+           COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
+    FROM ${sendHistory}
+    WHERE userId = ${userId} 
+      AND ${sendHistory.sentAt} >= DATE_SUB(NOW(), INTERVAL ${days} DAY)
+    GROUP BY CAST(DATE(${sendHistory.sentAt}) AS CHAR)
+    ORDER BY CAST(DATE(${sendHistory.sentAt}) AS CHAR) DESC
+  `);
+
+  return (result as unknown as Array<{ day: string; sent: number; failed: number }>);
+}
+
+export async function getAnalyticsByHour(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.select({
+    hour: sql<number>`HOUR(${sendHistory.sentAt})`,
+    sent: sql<number>`COUNT(CASE WHEN status = 'sent' THEN 1 END)`,
+    failed: sql<number>`COUNT(CASE WHEN status = 'failed' THEN 1 END)`,
+  }).from(sendHistory)
+    .where(eq(sendHistory.userId, userId))
+    .groupBy(sql`HOUR(${sendHistory.sentAt})`)
+    .orderBy(sql`HOUR(${sendHistory.sentAt}) ASC`);
+
+  return result;
+}
+
+export async function getAnalyticsByProduct(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.select({
+    linkId: sendHistory.linkId,
+    linkTitle: links.title,
+    sent: sql<number>`COUNT(CASE WHEN status = 'sent' THEN 1 END)`,
+    failed: sql<number>`COUNT(CASE WHEN status = 'failed' THEN 1 END)`,
+  }).from(sendHistory)
+    .leftJoin(links, eq(sendHistory.linkId, links.id))
+    .where(eq(sendHistory.userId, userId))
+    .groupBy(sendHistory.linkId)
+    .orderBy(sql`COUNT(CASE WHEN status = 'sent' THEN 1 END) DESC`);
+
+  return result;
+}
+
+export async function getAnalyticsByDayOfWeek(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  
+  const result = await db.select({
+    dayOfWeek: sql<number>`DAYOFWEEK(${sendHistory.sentAt}) - 1`,
+    sent: sql<number>`COUNT(CASE WHEN status = 'sent' THEN 1 END)`,
+    failed: sql<number>`COUNT(CASE WHEN status = 'failed' THEN 1 END)`,
+  }).from(sendHistory)
+    .where(eq(sendHistory.userId, userId))
+    .groupBy(sql`DAYOFWEEK(${sendHistory.sentAt})`)
+    .orderBy(sql`DAYOFWEEK(${sendHistory.sentAt}) ASC`);
+
+  return result.map(r => ({
+    ...r,
+    dayName: dayNames[r.dayOfWeek] || 'Unknown',
+  }));
+}
